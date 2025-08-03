@@ -61,6 +61,10 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !authorizeSelf(w, r, id) {
+		return
+	}
+
 	user, err := h.userService.GetUserByID(id)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "ユーザー取得時にエラーが発生しました")
@@ -108,6 +112,10 @@ func (h *UserHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !authorizeSelf(w, r, id) {
+		return
+	}
+
 	// リクエストボディのパース
 	var req struct {
 		Name  *string `json:"name"`
@@ -147,6 +155,10 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "IDは数値である必要があります")
+		return
+	}
+
+	if !authorizeSelf(w, r, id) {
 		return
 	}
 
@@ -199,4 +211,18 @@ func respondWithJson(w http.ResponseWriter, status int, data interface{}) {
 
 func respondWithError(w http.ResponseWriter, status int, message string) {
 	respondWithJson(w, status, map[string]string{"error": message})
+}
+
+func authorizeSelf(w http.ResponseWriter, r *http.Request, paramID int) bool {
+	userID, ok := auth.GetUserID(r.Context())
+	if !ok {
+		respondWithError(w, http.StatusUnauthorized, "ログインが必要です")
+		return false
+	}
+
+	if userID != paramID {
+		respondWithError(w, http.StatusForbidden, "他のユーザーの情報は取得できません")
+		return false
+	}
+	return true
 }
